@@ -70,6 +70,31 @@ Welcome to **ResumeRadar** – Your AI-powered job-fit analyzer.
 Upload your **Resume** and the **Job Description (JD)** below to get a match score, smart insights, and shortlist recommendations. 🚀
 """)
 
+# Theme toggle (Light/Dark Mode)
+theme = st.radio("Choose Theme", ("Light", "Dark"))
+if theme == "Dark":
+    st.markdown("""
+        <style>
+            body {
+                background-color: #181818;
+                color: white;
+            }
+            .stButton>button {
+                background-color: #4CAF50;
+                color: white;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <style>
+            body {
+                background-color: white;
+                color: black;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
 # Text Area Input
 jd_input = st.text_area("📝 Paste Job Description:", height=200)
 cv_input = st.text_area("👤 Paste Resume:", height=200)
@@ -110,6 +135,12 @@ if st.button("🔍 Analyze & Match"):
             st.success("🎯 Candidate SHORTLISTED for interview!")
         else:
             st.warning("❌ Candidate NOT shortlisted. Needs closer alignment with JD.")
+
+        # Highlight missing keywords
+        missing_keywords = list(set(jd_keywords) - set(cv_keywords))
+        if missing_keywords:
+            st.markdown("### ❌ Missing Keywords:")
+            st.write(missing_keywords)
 
         # PDF Report Download
         pdf_file = generate_pdf_report(jd_keywords, cv_keywords, score)
