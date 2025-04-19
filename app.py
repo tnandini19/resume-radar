@@ -17,17 +17,20 @@ def extract_keywords(text):
 # --- Streamlit UI ---
 st.set_page_config(page_title="ResumeRadar", page_icon="📄")
 st.title("📄 ResumeRadar: JD ↔️ CV Matcher")
-st.write("Upload or paste a Job Description and Resume to calculate match score.")
+st.markdown("""
+Welcome to **ResumeRadar** – Your AI-powered job-fit analyzer.  
+Upload your **Resume** and the **Job Description (JD)** below to get a match score, smart insights, and shortlist recommendations. 🚀
+""")
 
 jd_input = st.text_area("📝 Paste Job Description:", height=200)
 cv_input = st.text_area("👤 Paste Resume:", height=200)
 
 if st.button("🔍 Analyze & Match"):
     if jd_input and cv_input:
-        jd_keywords = extract_keywords(jd_input)
-        cv_keywords = extract_keywords(cv_input)
-
-        score = calculate_match_score(jd_keywords, cv_keywords)
+        with st.spinner("🔍 Analyzing and calculating match score..."):
+            jd_keywords = extract_keywords(jd_input)
+            cv_keywords = extract_keywords(cv_input)
+            score = calculate_match_score(jd_keywords, cv_keywords)
 
         st.markdown(f"### ✅ Match Score: `{score}%`")
         st.markdown("**JD Keywords:**")
