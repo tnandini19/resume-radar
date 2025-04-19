@@ -3,12 +3,13 @@ import spacy
 import fitz  # PyMuPDF
 from fpdf import FPDF
 import base64
-from match_agent import calculate_match_score
+from jd_extractor import extract_keywords as extract_jd_keywords, keyword_match_score
+from resume_parser import extract_text_from_pdf, extract_resume_keywords
 
 # Load SpaCy model
 nlp = spacy.load("en_core_web_sm")
 
-# --- Keyword Extractor ---
+# --- Keyword Extractor --- (JD)
 def extract_keywords(text):
     doc = nlp(text)
     keywords = []
@@ -17,13 +18,12 @@ def extract_keywords(text):
             keywords.append(token.text.lower())
     return list(set(keywords))
 
-# --- PDF Text Extractor ---
-def extract_text_from_pdf(uploaded_file):
-    doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-    text = ""
-    for page in doc:
-        text += page.get_text()
-    return text
+# --- PDF Text Extractor --- (from Resume)
+def extract_resume_from_file(uploaded_file):
+    """Helper function to save the uploaded file temporarily and extract text."""
+    with open("temp_resume.pdf", "wb") as f:
+        f.write(uploaded_file.read())
+    return extract_text_from_pdf("temp_resume.pdf")
 
 # --- PDF Report Generator ---
 def generate_pdf_report(jd_keywords, cv_keywords, score):
@@ -83,15 +83,20 @@ cv_pdf = st.file_uploader("Upload Resume (PDF)", type=["pdf"], key="cv")
 if jd_pdf:
     jd_input = extract_text_from_pdf(jd_pdf)
 if cv_pdf:
-    cv_input = extract_text_from_pdf(cv_pdf)
+    cv_input = extract_resume_from_file(cv_pdf)
 
 # Match Button
 if st.button("🔍 Analyze & Match"):
     if jd_input and cv_input:
         with st.spinner("🔍 Analyzing and calculating match score..."):
-            jd_keywords = extract_keywords(jd_input)
+            # Extract JD keywords using custom JD extractor
+            jd_keywords = extract_jd_keywords(jd_input)
+
+            # Extract resume keywords
             cv_keywords = extract_keywords(cv_input)
-            score = calculate_match_score(jd_keywords, cv_keywords)
+
+            # Calculate match score using the match scoring function
+            score, matched_keywords = keyword_match_score(jd_keywords, cv_keywords)
 
         # Results
         st.markdown(f"### ✅ Match Score: `{score}%`")
@@ -100,6 +105,7 @@ if st.button("🔍 Analyze & Match"):
         st.markdown("**Resume Keywords:**")
         st.write(cv_keywords)
 
+        # Display result message based on match score
         if score >= 60:
             st.success("🎯 Candidate SHORTLISTED for interview!")
         else:
