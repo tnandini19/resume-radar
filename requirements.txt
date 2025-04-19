@@ -1,1 +1,5 @@
-spacy==3.5.0  # Or any version you are using locally
+streamlit==1.30.0
+pandas
+scikit-learn
+spacy==3.7.2
+-e .
