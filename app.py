@@ -71,18 +71,100 @@ def get_pdf_download_link(file_path):
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="ResumeRadar", page_icon="📄", layout="wide")
+
+# 💡 Theme Toggle Feature
+# 💡 Theme Toggle Feature
+theme = st.radio("🌓 Choose Theme", ("Light", "Dark"), horizontal=True)
+
+if theme == "Dark":
+    st.markdown("""
+        <style>
+            html, body, .stApp {
+                background-color: #181818;
+                color: white;
+            }
+            .stTextInput > div > div > input,
+            .stTextArea > div > textarea,
+            .stFileUploader > div,
+            .stFileUploader label,
+            .stTextArea textarea {
+                background-color: #262730;
+                color: white;
+            }
+            .stButton > button {
+                background-color: #444;
+                color: white;
+                border: 1px solid #666;
+            }
+            .css-1cpxqw2, .css-1v3fvcr, .css-1kyxreq, .css-1aehpvj {
+                background-color: #262730 !important;
+                color: white !important;
+            }
+            .css-1cpxqw2:focus, .css-1v3fvcr:focus {
+                border-color: #888 !important;
+            }
+            /* Ensuring visibility of theme options in dark mode */
+            .stRadio label {
+                color: white !important;
+            }
+            .stRadio input[type="radio"]:checked + label {
+                color: white !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <style>
+            html, body, .stApp {
+                background-color: white;
+                color: black;
+            }
+            .stTextInput > div > div > input,
+            .stTextArea > div > textarea,
+            .stFileUploader > div,
+            .stFileUploader label,
+            .stTextArea textarea {
+                background-color: #f5f5f5;
+                color: black;
+            }
+            .stButton > button {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+            }
+            .css-1cpxqw2, .css-1v3fvcr, .css-1kyxreq, .css-1aehpvj {
+                background-color: #f5f5f5 !important;
+                color: black !important;
+            }
+            /* Ensuring radio button labels and associated text are black in light theme */
+            .stRadio label {
+                color: black !important;
+            }
+            .stRadio input[type="radio"]:checked + label,
+            .stRadio input[type="radio"]:hover + label {
+                color: black !important;
+            }
+            /* Ensuring the text "Light" and "Dark" labels are also black */
+            .stRadio div {
+                color: black !important;
+            }
+            .stRadio label {
+                color: black !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+
+# Now resume regular UI rendering
 st.title("📄 ResumeRadar: JD ↔️ Resume Analyzer")
 st.markdown("""
 Welcome to **ResumeRadar** – Your AI-powered job-fit analyzer.  
 Upload your **Resume** and the **Job Description (JD)** to get:
-- ✅ Match score
-- 📌 Missing keywords
-- ☁️ Wordclouds
+- ✅ Match score  
+- 📌 Missing keywords  
+- ☁️ Wordclouds  
 - 🧾 Downloadable PDF report
 """)
-
-# Streamlit built-in theme handling (this will automatically handle the theme based on user preference)
-theme = st.get_option("theme.base")
 
 # Layout split
 col1, col2 = st.columns(2)
