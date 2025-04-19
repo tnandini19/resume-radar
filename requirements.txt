@@ -8,3 +8,4 @@ PyMuPDF
 yagmail
 wordcloud
 matplotlib
+
