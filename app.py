@@ -1,119 +1,134 @@
 import streamlit as st
-import pandas as pd
 import spacy
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
-from resume_parser import extract_text_from_pdf, extract_resume_keywords
-from job_parser import extract_job_description
-from match_engine import calculate_match_score
+import fitz  # PyMuPDF
 from fpdf import FPDF
 import base64
-import fitz
-import os
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+from jd_extractor import extract_keywords as extract_jd_keywords, keyword_match_score
+from resume_parser import extract_text_from_pdf, extract_resume_keywords
 
-# Load spaCy model
+# Load SpaCy model
 nlp = spacy.load("en_core_web_sm")
 
-# Set page config
-st.set_page_config(page_title="ResumeRadar", layout="wide")
+# --- Keyword Extractor ---
+def extract_keywords(text):
+    doc = nlp(text)
+    keywords = []
+    for token in doc:
+        if token.pos_ in ["NOUN", "PROPN"] and not token.is_stop and token.is_alpha:
+            keywords.append(token.text.lower())
+    return list(set(keywords))
 
-# Detect current theme
-current_theme = st.get_option("theme.base")
-background_color = "#FFFFFF" if current_theme == "light" else "#0E1117"
-text_color = "#000000" if current_theme == "light" else "#FFFFFF"
+# --- WordCloud Generator ---
+def show_wordcloud(title, text):
+    st.subheader(title)
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(" ".join(text))
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis("off")
+    st.pyplot(fig)
 
-# Custom styling
-st.markdown(f"""
-    <style>
-    .main {{
-        background-color: {background_color};
-        color: {text_color};
-    }}
-    h1, h2, h3, h4, h5, h6 {{
-        color: {text_color};
-    }}
-    .reportview-container .markdown-text-container {{
-        font-family: 'Segoe UI', sans-serif;
-    }}
-    </style>
-""", unsafe_allow_html=True)
+# --- PDF Resume Extractor ---
+def extract_resume_from_file(uploaded_file):
+    with open("temp_resume.pdf", "wb") as f:
+        f.write(uploaded_file.read())
+    return extract_text_from_pdf("temp_resume.pdf")
 
-# Title Section
-st.markdown(f"<h1 style='text-align: center;'>📄 ResumeRadar</h1>", unsafe_allow_html=True)
+# --- PDF Report Generator ---
+def generate_pdf_report(jd_keywords, cv_keywords, score):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt="ResumeRadar Match Report", ln=True, align="C")
+    pdf.ln(10)
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt=f"Match Score: {score}%", ln=True)
+    pdf.ln(5)
 
-# Uploaders
-st.markdown("### Upload Files")
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(200, 10, txt="JD Keywords:", ln=True)
+    pdf.set_font("Arial", size=12)
+    for word in jd_keywords:
+        pdf.cell(200, 10, txt=f"- {word}", ln=True)
+
+    pdf.ln(5)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(200, 10, txt="Resume Keywords:", ln=True)
+    pdf.set_font("Arial", size=12)
+    for word in cv_keywords:
+        pdf.cell(200, 10, txt=f"- {word}", ln=True)
+
+    pdf_output = "match_report.pdf"
+    pdf.output(pdf_output)
+    return pdf_output
+
+def get_pdf_download_link(file_path):
+    with open(file_path, "rb") as f:
+        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+    href = f'<a href="data:application/octet-stream;base64,{base64_pdf}" download="match_report.pdf">📥 Download Match Report (PDF)</a>'
+    return href
+
+# --- Streamlit UI ---
+st.set_page_config(page_title="ResumeRadar", page_icon="📄", layout="wide")
+st.title("📄 ResumeRadar: JD ↔️ Resume Analyzer")
+st.markdown("""
+Welcome to **ResumeRadar** – Your AI-powered job-fit analyzer.  
+Upload your **Resume** and the **Job Description (JD)** to get:
+- ✅ Match score
+- 📌 Missing keywords
+- ☁️ Wordclouds
+- 🧾 Downloadable PDF report
+""")
+
+# Streamlit built-in theme handling (this will automatically handle the theme based on user preference)
+theme = st.get_option("theme.base")
+
+# Layout split
 col1, col2 = st.columns(2)
 
 with col1:
-    cv_pdf = st.file_uploader("Upload Resume (PDF)", type=["pdf"], key="cv")
+    jd_input = st.text_area("📝 Paste Job Description:", height=250)
+    jd_pdf = st.file_uploader("📄 Or Upload JD (PDF)", type=["pdf"], key="jd")
+    if jd_pdf:
+        jd_input = extract_text_from_pdf(jd_pdf)
+
 with col2:
-    jd_txt = st.file_uploader("Upload Job Description (PDF/TXT)", type=["pdf", "txt"], key="jd")
+    cv_input = st.text_area("👤 Paste Resume:", height=250)
+    cv_pdf = st.file_uploader("📄 Or Upload Resume (PDF)", type=["pdf"], key="cv")
+    if cv_pdf:
+        cv_input = extract_resume_from_file(cv_pdf)
 
-# File processing
-if cv_pdf and jd_txt:
-    with st.spinner("Processing documents and calculating match score..."):
+if st.button("🔍 Analyze & Match"):
+    if jd_input and cv_input:
+        with st.spinner("Analyzing and matching... 🚀"):
+            jd_keywords = extract_jd_keywords(jd_input)
+            cv_keywords = extract_keywords(cv_input)
+            score, matched_keywords = keyword_match_score(jd_keywords, cv_keywords)
 
-        # Extract text
-        cv_text = extract_text_from_pdf(cv_pdf)
-        jd_text = extract_text_from_pdf(jd_txt) if jd_txt.name.endswith(".pdf") else jd_txt.read().decode("utf-8")
+        st.subheader(f"🎯 Match Score: {score}%")
+        if score >= 60:
+            st.success("Looks like a strong match! Shortlisted ✅")
+        else:
+            st.warning("Needs improvement. Consider adding missing keywords.")
 
-        # Extracted keywords
-        cv_keywords = extract_resume_keywords(cv_text)
-        jd_keywords = extract_resume_keywords(jd_text)
+        st.markdown("### 📌 JD Keywords")
+        st.write(jd_keywords)
 
-        # Match Score Calculation
-        score, matched_keywords = calculate_match_score(cv_keywords, jd_keywords)
+        st.markdown("### 📌 Resume Keywords")
+        st.write(cv_keywords)
 
-        # Show Score
-        st.success(f"✅ Match Score: {score}%")
+        missing = list(set(jd_keywords) - set(cv_keywords))
+        if missing:
+            st.markdown("### ❌ Missing Keywords")
+            st.write(missing)
 
-        # Matched keywords
-        st.markdown("#### ✅ Matched Keywords")
-        st.write(", ".join(matched_keywords))
+        # Wordclouds
+        show_wordcloud("☁️ JD Wordcloud", jd_keywords)
+        show_wordcloud("☁️ Resume Wordcloud", cv_keywords)
 
-        # WordCloud
-        st.markdown("#### ☁️ Resume Keyword WordCloud")
-        wordcloud = WordCloud(width=800, height=400, background_color=background_color, colormap='Set2').generate(cv_text)
-        fig, ax = plt.subplots()
-        ax.imshow(wordcloud, interpolation='bilinear')
-        ax.axis("off")
-        st.pyplot(fig)
-
-        # PDF Preview (optional)
-        with st.expander("🔍 Preview Uploaded Resume"):
-            with open("temp_resume.pdf", "wb") as f:
-                f.write(cv_pdf.getbuffer())
-            with fitz.open("temp_resume.pdf") as doc:
-                for page in doc:
-                    pix = page.get_pixmap()
-                    st.image(pix.tobytes("png"))
-
-        # Downloadable Report
-        st.markdown("### 📥 Download Match Report")
-
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt="ResumeRadar - Match Report", ln=True, align='C')
-        pdf.ln(10)
-        pdf.multi_cell(0, 10, txt=f"Match Score: {score}%")
-        pdf.ln(5)
-        pdf.multi_cell(0, 10, txt="Matched Keywords: " + ", ".join(matched_keywords))
-
-        report_path = "match_report.pdf"
-        pdf.output(report_path)
-
-        with open(report_path, "rb") as file:
-            btn = st.download_button(
-                label="📄 Download PDF Report",
-                data=file,
-                file_name="ResumeRadar_Report.pdf",
-                mime="application/pdf"
-            )
-
-        # Clean up
-        os.remove("temp_resume.pdf")
-        os.remove(report_path)
-else:
-    st.info("⬆️ Please upload both a resume and a job description to proceed.")
+        # PDF Download
+        report = generate_pdf_report(jd_keywords, cv_keywords, score)
+        st.markdown(get_pdf_download_link(report), unsafe_allow_html=True)
+    else:
+        st.error("Please upload or paste both Job Description and Resume.")
