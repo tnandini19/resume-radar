@@ -8,4 +8,4 @@ PyMuPDF
 yagmail
 wordcloud
 matplotlib
-
+PyPDF2
