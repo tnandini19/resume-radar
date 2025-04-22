@@ -7,6 +7,10 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from jd_extractor import extract_keywords as extract_jd_keywords, keyword_match_score
 from resume_parser import extract_text_from_pdf, extract_resume_keywords
+from datetime import datetime
+import hashlib
+import os
+import json
 
 # --- Bias Detection ---
 def detect_bias_terms(text):
@@ -84,145 +88,194 @@ def get_pdf_download_link(file_path):
     href = f'<a href="data:application/octet-stream;base64,{base64_pdf}" download="match_report.pdf">📥 Download Match Report (PDF)</a>'
     return href
 
+# --- User Authentication (Login/Signup) ---
+def create_user_account(username, password):
+    users_db = "users_db.json"
+    if os.path.exists(users_db):
+        with open(users_db, 'r') as f:
+            users = json.load(f)
+    else:
+        users = {}
+    
+    if username in users:
+        return False  # User already exists
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    users[username] = hashed_password
+
+    with open(users_db, 'w') as f:
+        json.dump(users, f)
+    return True
+
+def authenticate_user(username, password):
+    users_db = "users_db.json"
+    if os.path.exists(users_db):
+        with open(users_db, 'r') as f:
+            users = json.load(f)
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        if username in users and users[username] == hashed_password:
+            return True
+    return False
+
+# --- Saving and Retrieving Data ---
+def save_user_data(username, data):
+    data_file = f"{username}_data.json"
+    with open(data_file, 'w') as f:
+        json.dump(data, f)
+
+def retrieve_user_data(username):
+    data_file = f"{username}_data.json"
+    if os.path.exists(data_file):
+        with open(data_file, 'r') as f:
+            return json.load(f)
+    return {}
+
 # --- Streamlit UI ---
 st.set_page_config(page_title="ResumeRadar", page_icon="📄", layout="wide")
+
+# Check if user is logged in (using session_state)
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
 # 💡 Theme Toggle Feature
 theme = st.radio("🌓 Choose Theme", ("Light", "Dark"), horizontal=True)
 
 if theme == "Dark":
-    st.markdown(""" 
-        <style> 
-            html, body, .stApp { 
-                background-color: #181818; 
-                color: white; 
-            } 
-            .stTextInput > div > div > input, 
-            .stTextArea > div > textarea, 
-            .stFileUploader > div, 
-            .stFileUploader label, 
-            .stTextArea textarea { 
-                background-color: #262730; 
-                color: white; 
-            } 
-            .stButton > button { 
-                background-color: #444; 
-                color: white; 
-                border: 1px solid #666; 
-            } 
-            .css-1cpxqw2, .css-1v3fvcr, .css-1kyxreq, .css-1aehpvj { 
-                background-color: #262730 !important; 
-                color: white !important; 
-            } 
-            .css-1cpxqw2:focus, .css-1v3fvcr:focus { 
-                border-color: #888 !important; 
-            } 
-            .stRadio label { 
-                color: white !important; 
-            } 
-            .stRadio input[type="radio"]:checked + label { 
-                color: white !important; 
-            } 
-        </style> 
+    st.markdown("""
+        <style>
+            html, body, .stApp {
+                background-color: #181818;
+                color: #FFFFFF;
+            }
+            h1, h2, h3, h4, h5, h6, p, div, span {
+                color: #FFFFFF !important;
+            }
+            .stTextInput input,
+            .stTextArea textarea,
+            .stFileUploader,
+            .stSelectbox div,
+            .stButton>button {
+                background-color: #2c2c2c !important;
+                color: #FFFFFF !important;
+            }
+        </style>
     """, unsafe_allow_html=True)
 else:
-    st.markdown(""" 
-        <style> 
-            html, body, .stApp { 
-                background-color: white; 
-                color: black; 
-            } 
-            .stTextInput > div > div > input, 
-            .stTextArea > div > textarea, 
-            .stFileUploader > div, 
-            .stFileUploader label, 
-            .stTextArea textarea { 
-                background-color: #f5f5f5; 
-                color: black; 
-            } 
-            .stButton > button { 
-                background-color: #4CAF50; 
-                color: white; 
-                border: none; 
-            } 
-            .css-1cpxqw2, .css-1v3fvcr, .css-1kyxreq, .css-1aehpvj { 
-                background-color: #f5f5f5 !important; 
-                color: black !important; 
-            } 
-            .stRadio label { 
-                color: black !important; 
-            } 
-            .stRadio input[type="radio"]:checked + label, 
-            .stRadio input[type="radio"]:hover + label { 
-                color: black !important; 
-            } 
-        </style> 
+    st.markdown("""
+        <style>
+            html, body, .stApp {
+                background-color: #FFFFFF;
+                color: #000000;
+            }
+            h1, h2, h3, h4, h5, h6, p, div, span {
+                color: #000000 !important;
+            }
+            .stTextInput input,
+            .stTextArea textarea,
+            .stFileUploader,
+            .stSelectbox div,
+            .stButton>button {
+                background-color: #f5f5f5 !important;
+                color: #000000 !important;
+            }
+        </style>
     """, unsafe_allow_html=True)
 
+# --- Authentication UI ---
+if not st.session_state.logged_in:
+    auth_option = st.radio("📑 Login or Signup", ("Login", "Signup"))
 
-st.title("📄 ResumeRadar: JD ↔️ Resume Analyzer")
-st.markdown("""
-Welcome to **ResumeRadar** – Your AI-powered job-fit analyzer.  
-Upload your **Resume** and the **Job Description (JD)** to get:
-- ✅ Match score  
-- 📌 Missing keywords  
-- ☁️ Wordclouds  
-- 🧾 Downloadable PDF report
-""")
+    if auth_option == "Signup":
+        st.subheader("Create a new account")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        confirm_password = st.text_input("Confirm Password", type="password")
 
-# Layout split
-col1, col2 = st.columns(2)
-
-with col1:
-    jd_input = st.text_area("📝 Paste Job Description:", height=250)
-    jd_pdf = st.file_uploader("📄 Or Upload JD (PDF)", type=["pdf"], key="jd")
-    if jd_pdf:
-        jd_input = extract_text_from_pdf(jd_pdf)
-
-with col2:
-    cv_input = st.text_area("👤 Paste Resume:", height=250)
-    cv_pdf = st.file_uploader("📄 Or Upload Resume (PDF)", type=["pdf"], key="cv")
-    if cv_pdf:
-        cv_input = extract_resume_from_file(cv_pdf)
-
-if st.button("🔍 Analyze & Match"):
-    if jd_input and cv_input:
-        with st.spinner("Analyzing and matching... 🚀"):
-            jd_keywords = extract_jd_keywords(jd_input)
-            cv_keywords = extract_keywords(cv_input)
-            score, matched_keywords = keyword_match_score(jd_keywords, cv_keywords)
-            
-            bias_jd = detect_bias_terms(jd_input)
-            bias_cv = detect_bias_terms(cv_input)
-
-        if bias_jd or bias_cv:
-            st.markdown("### ⚠️ Bias Alert")
-            if bias_jd:
-                st.warning("Bias detected in **Job Description**:")
-                for term, suggestion in bias_jd.items():
-                    st.write(f"- **{term}** → {suggestion}")
-            if bias_cv:
-                st.warning("Bias detected in **Resume**:")
-                for term, suggestion in bias_cv.items():
-                    st.write(f"- **{term}** → {suggestion}")
-    
-        st.subheader(f"🎯 Match Score: {score}%")
-        if score >= 60:
-            st.success("Looks like a strong match! Shortlisted ✅")
+        if password == confirm_password:
+            if st.button("Create Account"):
+                if create_user_account(username, password):
+                    st.success("Account created successfully!")
+                else:
+                    st.warning("Username already taken.")
         else:
-            st.warning("Needs improvement. Consider adding missing keywords.")
+            st.warning("Passwords do not match.")
+    else:
+        st.subheader("Login to your account")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
 
-        st.markdown("### 📌 JD Keywords")
-        st.write(jd_keywords)
+        if st.button("Login"):
+            if authenticate_user(username, password):
+                st.success("Logged in successfully!")
+                st.session_state.logged_in = True
+                user_data = retrieve_user_data(username)
+            else:
+                st.error("Invalid credentials.")
+else:
+    # Display app features after login
+    st.title("📄 ResumeRadar: JD ↔️ Resume Analyzer")
+    st.markdown(""" 
+    Welcome to **ResumeRadar** – Your AI-powered job-fit analyzer.  
+    Upload your **Resume** and the **Job Description (JD)** to get: 
+    - ✅ Match score  
+    - 📌 Missing keywords  
+    - ☁️ Wordclouds  
+    - 🧾 Downloadable PDF report
+    """)
 
-        st.markdown("### 📌 Resume Keywords")
-        st.write(cv_keywords)
+    # Layout split
+    col1, col2 = st.columns(2)
 
-        missing = list(set(jd_keywords) - set(cv_keywords))
-        if missing:
-            st.markdown("### ❌ Missing Keywords")
-            st.write(missing)
-                # Generate PDF and show download link
-        report_path = generate_pdf_report(jd_keywords, cv_keywords, score)
-        st.markdown("### 📄 Download Match Report")
-        st.markdown(get_pdf_download_link(report_path), unsafe_allow_html=True)
+    with col1:
+        jd_input = st.text_area("📝 Paste Job Description:", height=250)
+        jd_pdf = st.file_uploader("📄 Or Upload JD (PDF)", type=["pdf"], key="jd")
+        if jd_pdf:
+            jd_input = extract_text_from_pdf(jd_pdf)
+
+    with col2:
+        cv_input = st.text_area("👤 Paste Resume:", height=250)
+        cv_pdf = st.file_uploader("📄 Or Upload Resume (PDF)", type=["pdf"], key="cv")
+        if cv_pdf:
+            cv_input = extract_resume_from_file(cv_pdf)
+
+    if st.button("🔍 Analyze & Match"):
+        if jd_input and cv_input:
+            with st.spinner("Analyzing and matching... 🚀"):
+                jd_keywords = extract_jd_keywords(jd_input)
+                cv_keywords = extract_keywords(cv_input)
+                score, matched_keywords = keyword_match_score(jd_keywords, cv_keywords)
+
+                bias_jd = detect_bias_terms(jd_input)
+                bias_cv = detect_bias_terms(cv_input)
+
+            if bias_jd or bias_cv:
+                st.markdown("### ⚠️ Bias Alert")
+                if bias_jd:
+                    st.warning("Bias detected in **Job Description**:")
+                    for term, suggestion in bias_jd.items():
+                        st.write(f"- **{term}** → {suggestion}")
+                if bias_cv:
+                    st.warning("Bias detected in **Resume**:")
+                    for term, suggestion in bias_cv.items():
+                        st.write(f"- **{term}** → {suggestion}")
+
+            st.subheader(f"🎯 Match Score: {score}%")
+            if score >= 60:
+                st.success("Looks like a strong match! Shortlisted ✅")
+            else:
+                st.warning("Needs improvement. Consider adding missing keywords.")
+
+            st.markdown("### 📌 JD Keywords")
+            st.write(jd_keywords)
+
+            st.markdown("### 📌 Resume Keywords")
+            st.write(cv_keywords)
+
+            missing = list(set(jd_keywords) - set(cv_keywords))
+            if missing:
+                st.markdown("### ❌ Missing Keywords")
+                st.write(missing)
+
+            # Generate PDF and show download link
+            report_path = generate_pdf_report(jd_keywords, cv_keywords, score)
+            st.markdown("### 📄 Download Match Report")
+            st.markdown(get_pdf_download_link(report_path), unsafe_allow_html=True)
