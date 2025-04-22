@@ -8,6 +8,21 @@ import matplotlib.pyplot as plt
 from jd_extractor import extract_keywords as extract_jd_keywords, keyword_match_score
 from resume_parser import extract_text_from_pdf, extract_resume_keywords
 
+# --- Bias Detection ---
+def detect_bias_terms(text):
+    biased_terms = {
+        "rockstar": "Use 'expert' or 'skilled professional'",
+        "ninja": "Use 'developer' or 'engineer'",
+        "guru": "Use 'specialist' or 'expert'",
+        "he": "Use gender-neutral language",
+        "she": "Use gender-neutral language",
+        "dominant": "Use 'strong' or 'leading'",
+        "aggressive": "Use 'assertive' or 'proactive'",
+        "fearless": "Use 'confident'"
+    }
+    detected = {term: msg for term, msg in biased_terms.items() if term in text.lower()}
+    return detected
+
 # Load SpaCy model
 nlp = spacy.load("en_core_web_sm")
 
@@ -73,89 +88,78 @@ def get_pdf_download_link(file_path):
 st.set_page_config(page_title="ResumeRadar", page_icon="📄", layout="wide")
 
 # 💡 Theme Toggle Feature
-# 💡 Theme Toggle Feature
 theme = st.radio("🌓 Choose Theme", ("Light", "Dark"), horizontal=True)
 
 if theme == "Dark":
-    st.markdown("""
-        <style>
-            html, body, .stApp {
-                background-color: #181818;
-                color: white;
-            }
-            .stTextInput > div > div > input,
-            .stTextArea > div > textarea,
-            .stFileUploader > div,
-            .stFileUploader label,
-            .stTextArea textarea {
-                background-color: #262730;
-                color: white;
-            }
-            .stButton > button {
-                background-color: #444;
-                color: white;
-                border: 1px solid #666;
-            }
-            .css-1cpxqw2, .css-1v3fvcr, .css-1kyxreq, .css-1aehpvj {
-                background-color: #262730 !important;
-                color: white !important;
-            }
-            .css-1cpxqw2:focus, .css-1v3fvcr:focus {
-                border-color: #888 !important;
-            }
-            /* Ensuring visibility of theme options in dark mode */
-            .stRadio label {
-                color: white !important;
-            }
-            .stRadio input[type="radio"]:checked + label {
-                color: white !important;
-            }
-        </style>
+    st.markdown(""" 
+        <style> 
+            html, body, .stApp { 
+                background-color: #181818; 
+                color: white; 
+            } 
+            .stTextInput > div > div > input, 
+            .stTextArea > div > textarea, 
+            .stFileUploader > div, 
+            .stFileUploader label, 
+            .stTextArea textarea { 
+                background-color: #262730; 
+                color: white; 
+            } 
+            .stButton > button { 
+                background-color: #444; 
+                color: white; 
+                border: 1px solid #666; 
+            } 
+            .css-1cpxqw2, .css-1v3fvcr, .css-1kyxreq, .css-1aehpvj { 
+                background-color: #262730 !important; 
+                color: white !important; 
+            } 
+            .css-1cpxqw2:focus, .css-1v3fvcr:focus { 
+                border-color: #888 !important; 
+            } 
+            .stRadio label { 
+                color: white !important; 
+            } 
+            .stRadio input[type="radio"]:checked + label { 
+                color: white !important; 
+            } 
+        </style> 
     """, unsafe_allow_html=True)
 else:
-    st.markdown("""
-        <style>
-            html, body, .stApp {
-                background-color: white;
-                color: black;
-            }
-            .stTextInput > div > div > input,
-            .stTextArea > div > textarea,
-            .stFileUploader > div,
-            .stFileUploader label,
-            .stTextArea textarea {
-                background-color: #f5f5f5;
-                color: black;
-            }
-            .stButton > button {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-            }
-            .css-1cpxqw2, .css-1v3fvcr, .css-1kyxreq, .css-1aehpvj {
-                background-color: #f5f5f5 !important;
-                color: black !important;
-            }
-            /* Ensuring radio button labels and associated text are black in light theme */
-            .stRadio label {
-                color: black !important;
-            }
-            .stRadio input[type="radio"]:checked + label,
-            .stRadio input[type="radio"]:hover + label {
-                color: black !important;
-            }
-            /* Ensuring the text "Light" and "Dark" labels are also black */
-            .stRadio div {
-                color: black !important;
-            }
-            .stRadio label {
-                color: black !important;
-            }
-        </style>
+    st.markdown(""" 
+        <style> 
+            html, body, .stApp { 
+                background-color: white; 
+                color: black; 
+            } 
+            .stTextInput > div > div > input, 
+            .stTextArea > div > textarea, 
+            .stFileUploader > div, 
+            .stFileUploader label, 
+            .stTextArea textarea { 
+                background-color: #f5f5f5; 
+                color: black; 
+            } 
+            .stButton > button { 
+                background-color: #4CAF50; 
+                color: white; 
+                border: none; 
+            } 
+            .css-1cpxqw2, .css-1v3fvcr, .css-1kyxreq, .css-1aehpvj { 
+                background-color: #f5f5f5 !important; 
+                color: black !important; 
+            } 
+            .stRadio label { 
+                color: black !important; 
+            } 
+            .stRadio input[type="radio"]:checked + label, 
+            .stRadio input[type="radio"]:hover + label { 
+                color: black !important; 
+            } 
+        </style> 
     """, unsafe_allow_html=True)
 
 
-# Now resume regular UI rendering
 st.title("📄 ResumeRadar: JD ↔️ Resume Analyzer")
 st.markdown("""
 Welcome to **ResumeRadar** – Your AI-powered job-fit analyzer.  
@@ -187,7 +191,21 @@ if st.button("🔍 Analyze & Match"):
             jd_keywords = extract_jd_keywords(jd_input)
             cv_keywords = extract_keywords(cv_input)
             score, matched_keywords = keyword_match_score(jd_keywords, cv_keywords)
+            
+            bias_jd = detect_bias_terms(jd_input)
+            bias_cv = detect_bias_terms(cv_input)
 
+        if bias_jd or bias_cv:
+            st.markdown("### ⚠️ Bias Alert")
+            if bias_jd:
+                st.warning("Bias detected in **Job Description**:")
+                for term, suggestion in bias_jd.items():
+                    st.write(f"- **{term}** → {suggestion}")
+            if bias_cv:
+                st.warning("Bias detected in **Resume**:")
+                for term, suggestion in bias_cv.items():
+                    st.write(f"- **{term}** → {suggestion}")
+    
         st.subheader(f"🎯 Match Score: {score}%")
         if score >= 60:
             st.success("Looks like a strong match! Shortlisted ✅")
@@ -204,13 +222,7 @@ if st.button("🔍 Analyze & Match"):
         if missing:
             st.markdown("### ❌ Missing Keywords")
             st.write(missing)
-
-        # Wordclouds
-        show_wordcloud("☁️ JD Wordcloud", jd_keywords)
-        show_wordcloud("☁️ Resume Wordcloud", cv_keywords)
-
-        # PDF Download
-        report = generate_pdf_report(jd_keywords, cv_keywords, score)
-        st.markdown(get_pdf_download_link(report), unsafe_allow_html=True)
-    else:
-        st.error("Please upload or paste both Job Description and Resume.")
+                # Generate PDF and show download link
+        report_path = generate_pdf_report(jd_keywords, cv_keywords, score)
+        st.markdown("### 📄 Download Match Report")
+        st.markdown(get_pdf_download_link(report_path), unsafe_allow_html=True)
